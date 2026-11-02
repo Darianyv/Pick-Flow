@@ -1,0 +1,284 @@
+' ============================================================
+' PickFlow Académico - Diagramas UML (PlantUML)
+' Para renderizar: https://www.plantuml.com/plantuml  o  extensión
+' "PlantUML" de VS Code. Cada diagrama se exporta por separado
+' (PNG/SVG) para pegarlo en el informe.
+' ============================================================
+
+
+' ------------------------------------------------------------
+' 1. DIAGRAMA DE CLASES (PATRÓN MVC)
+' ------------------------------------------------------------
+@startuml PickFlow_Clases_MVC
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam classBackgroundColor #FFFFFF
+skinparam ArrowColor #333333
+title PickFlow Académico - Diagrama de clases (MVC)
+
+package "MODELO\n(datos y lógica del TSP)" #DDEEFF {
+
+  class Producto <<dataclass>> {
+    + codigo : str
+    + nombre : str
+    + pasillo : int
+    + lado : str
+    + x : float
+    + y : float
+    + posicion() : Punto
+  }
+
+  class Pedido {
+    + numero : str
+    + productos : tuple<Producto>
+    + contiene(producto) : bool
+    + alternar(producto) : bool
+    + limpiar() : void
+  }
+
+  class Almacen {
+    + {static} NUM_PASILLOS : int = 5
+    + {static} DEPOSITO : Punto
+    + {static} Y_PASILLO_FRONTAL : float
+    + {static} Y_PASILLO_TRASERO : float
+    + productos : tuple<Producto>
+    + x_eje_pasillo(pasillo) : float
+    + estanterias() : list
+    + obtener(codigo) : Producto
+    + producto_mas_cercano(x, y, radio) : Producto
+    + generar_pedido_aleatorio(cantidad, rng) : Pedido
+  }
+
+  class "Funciones TSP\n(módulo tsp.py)" as FuncionesTSP <<utilidad>> {
+    + {static} distancia_euclidiana(a, b) : float
+    + {static} construir_matriz_distancias(puntos, funcion_distancia) : Matriz
+    + {static} longitud_ruta(ruta, matriz) : float
+    + {static} eficiencia_porcentual(original, optimizada) : float
+    + {static} cruce_ox(padre1, padre2, rng) : list
+    + {static} mutar_inversion(individuo, rng) : list
+  }
+
+  abstract class MetricaDistancia {
+    + nombre : str
+    + sigue_pasillos : bool
+    + {abstract} distancia(a, b) : float
+    + {abstract} camino(a, b) : list<Punto>
+    + camino_completo(puntos) : list<Punto>
+  }
+
+  class MetricaEuclidiana {
+    + distancia(a, b) : float
+    + camino(a, b) : list<Punto>
+  }
+
+  class MetricaPorPasillos {
+    - _ajustar(punto) : (pasillo, Punto)
+    + distancia(a, b) : float
+    + camino(a, b) : list<Punto>
+  }
+
+  abstract class AlgoritmoTSP {
+    + nombre : str
+    + {abstract} resolver(matriz, etiquetas) : SolucionTSP
+  }
+
+  class VecinoMasCercano {
+    + resolver(matriz, etiquetas) : SolucionTSP
+  }
+
+  class AlgoritmoGenetico {
+    + config : ConfigAG
+    + semilla : int
+    + resolver(matriz, etiquetas) : SolucionTSP
+    - _seleccion_torneo(evaluada, rng) : list
+  }
+
+  class ConfigAG <<dataclass>> {
+    + tamano_poblacion : int = 100
+    + generaciones : int = 300
+    + prob_cruce : float = 0.9
+    + prob_mutacion : float = 0.3
+    + tamano_torneo : int = 3
+    + elitismo : int = 2
+    + sembrar_soluciones_iniciales : bool
+  }
+
+  class SolucionTSP <<dataclass>> {
+    + ruta : list<int>
+    + distancia : float
+    + pasos : list<str>
+  }
+
+  class PlanificadorRutas {
+    + nombres_algoritmos : list<str>
+    + nombres_metricas : list<str>
+    + planificar(pedido, nombre_algoritmo, nombre_metrica) : ResultadoOptimizacion
+  }
+
+  class ResultadoOptimizacion <<dataclass>> {
+    + algoritmo : str
+    + metrica : str
+    + sigue_pasillos : bool
+    + productos_optimizados : tuple<Producto>
+    + productos_originales : tuple<Producto>
+    + distancia_original : float
+    + distancia_optimizada : float
+    + distancia_real_original : float
+    + distancia_real_optimizada : float
+    + tiempo : float
+    + pasos : tuple<str>
+    + ruta_puntos : tuple<Punto>
+    + ruta_original_puntos : tuple<Punto>
+    + ahorro_metros() : float
+    + eficiencia_pct() : float
+    + eficiencia_real_pct() : float
+  }
+}
+
+package "VISTA\n(interfaz gráfica CustomTkinter)" #E3F6E3 {
+
+  class VentanaPrincipal <<CTk>> {
+    + conectar_controlador(controlador) : void
+    + definir_algoritmos(nombres) : void
+    + definir_metricas(nombres) : void
+    + metrica_seleccionada() : str
+    + cantidad_solicitada() : int
+    + algoritmo_seleccionado() : str
+    + mostrar_almacen(almacen) : void
+    + mostrar_pedido(paradas, ruta, ruta_original, sigue_pasillos) : void
+    + mostrar_lista(titulo, encabezado, filas) : void
+    + mostrar_traza(lineas) : void
+    + mostrar_metricas(metricas) : void
+    + mostrar_estado(mensaje) : void
+    + indicar_ocupado(ocupado) : void
+  }
+
+  class LienzoAlmacen <<tk.Canvas>> {
+    + definir_almacen(almacen) : void
+    + definir_escena(paradas, ruta, ruta_original, sigue_pasillos) : void
+    + mostrar_ruta_original(mostrar) : void
+    + redibujar() : void
+  }
+}
+
+package "CONTROLADOR\n(puente Vista - Modelo)" #FFF1D6 {
+
+  class ControladorPickFlow {
+    + iniciar() : void
+    + al_generar_pedido(cantidad) : void
+    + al_limpiar_pedido() : void
+    + al_hacer_clic_en_producto(producto) : void
+    + al_optimizar(nombre_algoritmo, nombre_metrica) : void
+    - _refrescar() : void
+  }
+}
+
+' --- Relaciones del modelo ---
+Almacen "1" *-- "80" Producto
+Pedido "1" o-- "*" Producto
+AlgoritmoTSP <|-- VecinoMasCercano
+AlgoritmoTSP <|-- AlgoritmoGenetico
+AlgoritmoTSP ..> SolucionTSP : devuelve
+AlgoritmoGenetico --> ConfigAG
+AlgoritmoGenetico ..> VecinoMasCercano : siembra la\npoblación inicial
+AlgoritmoGenetico ..> FuncionesTSP : cruce y mutación
+VecinoMasCercano ..> FuncionesTSP
+PlanificadorRutas "1" o-- "1..*" AlgoritmoTSP : estrategias
+MetricaDistancia <|-- MetricaEuclidiana
+MetricaDistancia <|-- MetricaPorPasillos
+MetricaEuclidiana ..> FuncionesTSP : distancia_euclidiana
+MetricaPorPasillos --> Almacen : lee los pasillos
+PlanificadorRutas "1" o-- "1..*" MetricaDistancia : estrategias
+PlanificadorRutas --> Almacen
+PlanificadorRutas ..> FuncionesTSP : matriz de distancias
+PlanificadorRutas ..> ResultadoOptimizacion : crea
+
+' --- Relaciones MVC ---
+VentanaPrincipal "1" *-- "1" LienzoAlmacen
+VentanaPrincipal --> ControladorPickFlow : eventos del usuario
+ControladorPickFlow --> VentanaPrincipal : actualiza la pantalla
+ControladorPickFlow --> PlanificadorRutas : solicita la ruta
+ControladorPickFlow --> Almacen
+ControladorPickFlow --> Pedido : pedido actual
+LienzoAlmacen ..> Almacen : lee la geometría
+
+note right of AlgoritmoTSP
+  Patrón Estrategia (1): se puede agregar
+  otro algoritmo sin modificar la
+  interfaz ni el controlador.
+end note
+
+note right of MetricaDistancia
+  Patrón Estrategia (2): los algoritmos solo
+  leen la matriz de distancias. Cambiar de
+  línea recta a pasillos no los modifica.
+end note
+@enduml
+
+
+' ------------------------------------------------------------
+' 2. DIAGRAMA DE SECUENCIA: OPTIMIZAR RUTA
+' ------------------------------------------------------------
+@startuml PickFlow_Secuencia_Optimizacion
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+title PickFlow Académico - Secuencia: del clic en "Optimizar" al dibujo de la ruta
+
+actor Usuario
+participant "VentanaPrincipal\n(Vista)" as V
+participant "ControladorPickFlow\n(Controlador)" as C
+participant "PlanificadorRutas\n(Modelo)" as P
+participant "Funciones TSP\n(Modelo)" as F
+participant "MetricaDistancia\n(Modelo)" as M
+participant "AlgoritmoTSP\n(Modelo)" as A
+participant "LienzoAlmacen\n(Vista)" as L
+
+Usuario -> V : clic en "Optimizar ruta"
+activate V
+V -> C : al_optimizar(nombre_algoritmo, nombre_metrica)
+activate C
+C -> V : indicar_ocupado(True)
+
+C -> P : planificar(pedido, nombre_algoritmo, nombre_metrica)
+activate P
+P -> P : puntos = [INICIO] + posiciones (x, y)\nde los productos del pedido
+P -> F : construir_matriz_distancias(puntos, metrica.distancia)
+loop por cada par de puntos
+  F -> M : distancia(a, b)\n(línea recta o por pasillos)
+  M --> F : metros
+end
+F --> P : matriz de distancias
+
+P -> A : resolver(matriz, etiquetas)
+activate A
+alt Vecino más cercano
+  loop mientras queden productos
+    A -> A : ir al producto pendiente\nmás cercano a la posición actual
+  end
+else Algoritmo genético
+  A -> A : crear población inicial
+  loop por cada generación
+    A -> A : evaluar rutas (distancia),\nselección por torneo,\ncruce OX y mutación
+  end
+end
+A --> P : SolucionTSP(ruta, distancia, pasos)
+deactivate A
+
+P -> F : longitud_ruta(orden original, matriz)
+F --> P : distancia original
+P -> M : camino_completo(ruta)
+M --> P : puntos del camino a dibujar\n(con esquinas si sigue pasillos)
+P --> C : ResultadoOptimizacion\n(distancias, orden, puntos de la ruta)
+deactivate P
+
+C -> V : indicar_ocupado(False)
+C -> V : mostrar_pedido(paradas, ruta, ruta_original, sigue_pasillos)
+V -> L : definir_escena(paradas, ruta, ruta_original, sigue_pasillos)
+L -> L : redibujar()\n(plano, red de pasillos, tramos de colores, números)
+C -> V : mostrar_lista(...) y mostrar_traza(...)
+C -> V : mostrar_metricas(original, optimizada, % eficiencia)
+deactivate C
+V --> Usuario : plano con la ruta, métricas\ny explicación paso a paso
+deactivate V
+@enduml
